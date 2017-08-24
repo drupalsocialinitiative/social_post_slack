@@ -1,0 +1,3 @@
+perform slack autoposting tasks:
+  title: 'Perform Slack autoposting'
+  description: "Perform Slack slack to the user's accounts"

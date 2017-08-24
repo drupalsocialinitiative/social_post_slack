@@ -1,0 +1,15 @@
+social_post_slack.settings:
+  title: 'Slack'
+  route_name: social_post_slack.settings_form
+  base_route: social_post.integrations
+
+social_post.slack.settings.tab:
+  title: 'Settings'
+  route_name: social_post_slack.settings_form
+  parent_id: social_post_slack.settings
+
+entity.social_post_slack_user.collection:
+  title: 'Users'
+  route_name: entity.social_post.collection
+  parent_id: social_post_slack.settings
+  route_parameters: { 'provider': 'slack' }

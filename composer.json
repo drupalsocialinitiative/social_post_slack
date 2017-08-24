@@ -1,0 +1,27 @@
+{
+    "name": "drupal/social_post_slack",
+    "type": "drupal-module",
+    "description": "Social Post Slack for Slack",
+    "keywords": ["Drupal"],
+    "license": "GPL-2.0+",
+    "homepage": "https://www.drupal.org/project/social_post_slack",
+    "minimum-stability": "dev",
+    "support": {
+        "issues": "https://www.drupal.org/project/issues/social_post_slack",
+        "source": "http://cgit.drupalcode.org/social_post_slack"
+    },
+    "require" : {
+        "league/oauth2-slack": "^2.0",
+        "slack/graph-sdk" : "~5.0"
+    },
+    "authors": [
+        {
+            "name": "Getulio Valentin Sánchez (gvso)",
+            "email": "valentin2507@gmail.com"
+        },
+        {
+            "name": "Himanshu Dixit (himanshu-dixit)",
+            "email": "hudixt@gmail.com"
+        }
+    ]
+}
