@@ -11,6 +11,7 @@ use Drupal\social_post\Plugin\Network\SocialPostNetwork;
 use Drupal\social_post_slack\Settings\SlackPostSettings;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Drupal\Core\Logger\LoggerChannelFactory;
+use GuzzleHttp\Psr7;
 
 use AdamPaterson\OAuth2\Client\Provider\Slack;
 
@@ -29,9 +30,22 @@ use AdamPaterson\OAuth2\Client\Provider\Slack;
  *   }
  * )
  */
-class SlackPost extends SocialPostNetwork {
+class SlackPost extends SocialPostNetwork implements SlackPostInterface {
 
   use LoggerChannelTrait;
+
+  /**
+   * @var string
+   */
+  protected $accessToken;
+
+  /**
+   * Slack client
+   *
+   * @var \AdamPaterson\OAuth2\Client\Provider\Slack
+   */
+  protected $client;
+
 
   /**
    * The url generator.
@@ -40,12 +54,6 @@ class SlackPost extends SocialPostNetwork {
    */
   protected $urlGenerator;
 
-  /**
-   * Slack connection.
-   *
-   * @var \League\OAuth2\Client\Provider\SlackOAuth
-   */
-  protected $connection;
 
   /**
    * The Post text.
@@ -112,7 +120,7 @@ class SlackPost extends SocialPostNetwork {
   /**
    * Sets the underlying SDK library.
    *
-   * @return \League\OAuth2\Client\Provider\Slack
+   * @return \AdamPaterson\OAuth2\Client\Provider\Slack
    *   The initialized 3rd party library instance.
    *
    * @throws SocialApiException
@@ -160,5 +168,38 @@ class SlackPost extends SocialPostNetwork {
 
     return TRUE;
   }
+
+  public function post() {
+    if (!$this->client) {
+      throw new SocialApiException('Call post() method from its wrapper doPost()');
+    }
+
+    $request = $this->client->getAuthenticatedRequest(
+        'POST',
+        'https://slack.com/api/chat.postMessage',
+        $this->accessToken);
+    $request->withAddedHeader('Content-Type', 'application/json')
+        ->withBody(Psr7\stream_for($this->status));
+
+    $response = $this->client->getResponse($request);
+
+    $body = json_decode($response->getBody(), TRUE);
+    if(!$body['ok']) {
+      $this->loggerFactory->get('social_post_slack')->error($response->getBody()->__toString());
+      return FALSE;
+    }
+    return TRUE;
+
+
+  }
+
+  public function doPost($access_token, $status) {
+    $this->accessToken = $access_token;
+    $this->status = $status;
+    $this->client = $this->getSdk();
+
+    $this->post();
+  }
+
 
 }

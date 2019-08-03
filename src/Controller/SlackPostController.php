@@ -28,14 +28,14 @@ class SlackPostController extends ControllerBase {
   /**
    * The Slack authentication manager.
    *
-   * @var \Drupal\social_auth_slack\SlackAuthManager
+   * @var \Drupal\social_post_slack\SlackPostAuthManager
    */
-  private $slackManager;
+  private $providerManager;
 
   /**
    * The Social Auth Data Handler.
    *
-   * @var \Drupal\social_auth\SocialAuthDataHandler
+   * @var \Drupal\social_post\SocialPostDataHandler
    */
   private $dataHandler;
 
@@ -76,11 +76,11 @@ class SlackPostController extends ControllerBase {
    * @param \Drupal\Core\Logger\LoggerChannelFactoryInterface $logger_factory
    *   Used for logging errors.
    */
-  public function __construct(NetworkManager $network_manager, SocialPostManager $user_manager, SlackPostAuthManager $slack_manager, RequestStack $request, SocialPostDataHandler $social_auth_data_handler, LoggerChannelFactoryInterface $logger_factory) {
+  public function __construct(NetworkManager $network_manager, SocialPostManager $user_manager, SlackPostAuthManager $provider_manager, RequestStack $request, SocialPostDataHandler $social_auth_data_handler, LoggerChannelFactoryInterface $logger_factory) {
 
     $this->networkManager = $network_manager;
     $this->postManager = $user_manager;
-    $this->slackManager = $slack_manager;
+    $this->providerManager = $provider_manager;
     $this->request = $request;
     $this->dataHandler = $social_auth_data_handler;
     $this->loggerFactory = $logger_factory;
@@ -111,7 +111,7 @@ class SlackPostController extends ControllerBase {
   /**
    * Redirects the user to Slack for authentication.
    */
-  public function redirectToFb() {
+  public function redirectToProvider() {
     /* @var \League\OAuth2\Client\Provider\Slack false $slack */
     $slack = $this->networkManager->createInstance('social_post_slack')->getSdk();
 
@@ -122,14 +122,14 @@ class SlackPostController extends ControllerBase {
     }
 
     // Slack service was returned, inject it to $slackManager.
-    $this->slackManager->setClient($slack);
+    $this->providerManager->setClient($slack);
 
     // Generates the URL where the user will be redirected for Slack login.
     // If the user did not have email permission granted on previous attempt,
     // we use the re-request URL requesting only the email address.
-    $slack_login_url = $this->slackManager->getFbLoginUrl();
+    $slack_login_url = $this->providerManager->getAuthorizationUrl();
 
-    $state = $this->slackManager->getState();
+    $state = $this->providerManager->getState();
 
     $this->dataHandler->set('oAuth2State', $state);
 
@@ -163,14 +163,20 @@ class SlackPostController extends ControllerBase {
     // Retrieves $_GET['state'].
     $retrievedState = $this->request->getCurrentRequest()->query->get('state');
 
-    $this->slackManager->setClient($slack)->authenticate();
+    if ($retrievedState !== $state) {
+      $this->postManager->nullifySessionKeys();
+      $this->messenger->addError($this->t('Slack login failed. Invalid Oauth2 state.'));
+      return $this->redirect('user.login');
+    }
 
-    if (!$slack_profile = $this->slackManager->getUserInfo()) {
+    $this->providerManager->setClient($slack)->authenticate();
+
+    if (!$slack_profile = $this->providerManager->getUserInfo()) {
       drupal_set_message($this->t('Slack login failed, could not load Slack profile. Contact site administrator.'), 'error');
       return $this->redirect('user.login');
     }
-    if (!$this->postManager->checkIfUserExists($this->slackManager->getUserInfo()->getId())) {
-      $this->postManager->addRecord('social_post_slack', $this->slackManager->getUserInfo()->getId(), $this->slackManager->getAccessToken(), $this->slackManager->getUserInfo()->getName(), '');
+    if (!$this->postManager->checkIfUserExists($slack_profile->getId())) {
+      $this->postManager->addRecord($slack_profile->getName(), $slack_profile->getId(),$slack_profile->getAccessToken());
     }
     return $this->redirect('entity.user.edit_form', ['user' => $this->postManager->getCurrentUser()]);
   }

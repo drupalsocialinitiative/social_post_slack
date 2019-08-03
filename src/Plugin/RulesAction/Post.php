@@ -77,6 +77,11 @@ class Post extends RulesActionBase implements ContainerFactoryPluginInterface {
   protected $loggerFactory;
 
   /**
+   * @var \Drupal\Core\Session\AccountInterface
+   */
+  protected $current_user;
+
+  /**
    * {@inheritdoc}
    */
   public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition) {
@@ -142,25 +147,15 @@ class Post extends RulesActionBase implements ContainerFactoryPluginInterface {
    * @param string $status
    *   The Post text.
    */
-  protected function doExecute($status) {
-    $slack = $this->networkManager->createInstance('social_post_slack')->getSdk();
+  protected function execute($status) {
 
-    // If slack client could not be obtained.
-    if (!$slack) {
-      drupal_set_message($this->t('Social Auth Slack not configured properly. Contact site administrator.'), 'error');
-      return $this->redirect('user.login');
-    }
+    $accounts = $this->postManager->getAccountsByUserId('social_post_slack', $this->currentUser->id());
 
-    // Slack service was returned, inject it to $slackManager.
-    $this->slackManager->setClient($slack);
 
-    $accounts = $this->postManager->getList('social_post_slack', \Drupal::currentUser()->id());
-
-    /* @var \Drupal\social_post_slack\Entity\SlackUserInterface $account */
+    /* @var \Drupal\social_post_slack\Entity\SlackUser $account */
     foreach ($accounts as $account) {
-      $access_token = $this->postManager->getToken('social_post_slack', $account->getSocialNetworkID())->access_token;
-      $provider_user_id = $account->getSocialNetworkID();
-      $this->slackManager->requestApiCall($status, $access_token, $provider_user_id);
+      $access_token = json_decode($this->postManager->getToken($account->getProviderUserId()), TRUE);
+      $this->slackPost->doPost($access_token, $status);
     }
   }
 
